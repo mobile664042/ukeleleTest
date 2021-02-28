@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+<title>和弦练习</title>
+
+<style>
+    td {
+      padding-top: 5px;
+    }
+  </style>
+</head>
+ 
+<body>
+
+
+
+<table style="margin-left: 10px;">
+	<tr>
+		<td id="chordContent" colspan="2" style="max-width: 410px; word-wrap:break-word; font-size:x-large"></td>
+	</tr>
+	<tr>
+		<td colspan="2">
+			<img alt="准备显示和弦图" style="border-radius: 50%;" id="chordImg" width="300px" height="300px"/>
+			<br/>
+			<font style="font-size: x-small" color="grey">
+				-----------------击点重新开始,上面将出现新的和弦(练习)-------------------<br/>
+				内置 A, AM, B, BM, C, C7, CM, D, DM, E, E7, EM, F, FM, G, G7, GM 和弦图
+			</font>
+			<br/>
+			<audio src="img/WalkTheRoadOfLove.mp3" autoplay="autoplay" controls="controls" loop="loop">
+			</audio>
+		</td>
+	</tr>
+	<tr>
+		<td> 
+			选择要输入的和弦多个用,分隔<br/>
+			<font style="font-size: x-small" color="grey">
+			(可再加上变长1-9的权重前缀, 例如：<br/>3G7,2C,F, 表示G7的权重是3 C的权重是2 F的权重是1)
+			(可再加上和弦延时后缀, 单位是100毫秒, 例如：<br/>3G7-10, 表示G7将增加10*1000播放时长)
+			</font>
+		</td>
+		<td style="padding-left: 10px"><input type="text" id="chords" style="width:280px;height:30px;padding-left: 10px;" placeholder="3G7,2C,4F,G" value=" A, AM, C, C7, D, DM, E7, EM, F, FM, G, G7, GM"/></td>
+	</tr>
+	<tr>
+		<td> 
+		    设置每两个和弦出现间隔时长<br/>
+		    <font style="font-size: x-small" color="grey">(毫秒, 例如2000,表示每隔2000毫秒出现下一个和弦)<br/>
+			(可再加上变长后缀, 例如：<br/>2000,100,表示每隔1900--2100毫秒出现下一个和弦)
+			</font>
+		</td>
+		<td style="padding-left: 10px"><input type="text" id="intervalMillisecond" style="width:70px;height:30px;padding-left: 10px;" placeholder="2000,300" value="2000"/></td>
+	</tr>
+	<tr>
+		<td colspan="2" align="center" >
+			<input type="button" onclick="rebootChord()" value="重新开始"/> 
+			<input type="button" id="timerComponent" onclick="stopTimer()" value="暂停" style="margin-left: 20px"/>
+		</td>
+	</tr>
+</table>
+
+<script type="text/javascript">
+
+var chordList;
+var intervalMillisecond;
+var randomMillisecond=0;
+var totalWeight = 0;
+var timer;
+
+function rebootChord(){
+	var chordContent = document.getElementById("chordContent");
+	chordContent.innerHTML = "";
+	document.getElementById("timerComponent").value="暂停";
+	
+	if(timer){
+		clearTimeout(timer);
+		timer=null;
+	}
+	
+	var chords = document.getElementById("chords").value.trim();
+	if(chords.length == 0){
+		alert("1请选择要输入的和弦多个用,分隔；可设置1-9的权重前缀(默认是1),例如：3G7,2C,4F,G");
+		return false;
+	}
+	
+	var intervalMillisecondStr = document.getElementById("intervalMillisecond").value.trim();
+	if(intervalMillisecondStr.length == 0){
+		alert("1请设置每两个和弦出现间隔时长；可设置每两个和弦出现间隔随机变速时长(毫秒)后缀(默认是0),例如：3000,1000");
+		return false;
+	}
+	
+	//初使化和弦
+	var strs = chords.split(",");
+	chordList = new Array();
+	totalWeight = 0;
+	for (var i=0, j=0; i<strs.length; i++){
+		var ch = strs[i].trim();
+		if(ch.lenght == 0){
+			continue;
+		}
+		
+		var weight = parseInt(ch[0]);
+		chordList[j] = {};
+		if(isNaN(weight)){
+			chordList[j].weight = 1;
+			chordList[j].ch = ch;
+		}
+		else{
+			chordList[j].weight = weight;
+			chordList[j].ch = ch.substring(1);
+		}
+		
+		//增加特定和弦延时
+		if(chordList[j].ch.indexOf("-") != -1 ){
+			var tempArray = chordList[j].ch.split("-");
+			chordList[j].ch = tempArray[0];
+			var addTime = parseInt(tempArray[1]);
+			if(!isNaN(addTime)){
+				chordList[j].addTime = addTime * 100;
+			}
+			else{
+				chordList[j].addTime = 0;	
+			}
+		}
+		else{
+			chordList[j].addTime = 0;
+		}
+		
+		chordList[j].start = totalWeight;
+		totalWeight += chordList[j].weight;
+		j++;
+	}
+	if(chordList.length == 0){
+		alert("2请选择要输入的和弦多个用,分隔；可设置1-9的权重前缀(默认是1),例如：3G7,2C,4F,G");
+		return false;
+	}
+	
+	//设置时间
+	var timeArray = intervalMillisecondStr.split(",");
+	var executeTimeStr = timeArray[0].trim();
+	if(executeTimeStr.length == 0){
+		alert("2请设置每两个和弦出现间隔时长；可设置每两个和弦出现间隔随机变速时长(毫秒)后缀(默认是0),例如：3,1");
+		return false;
+	}
+	var executeTime = parseInt(executeTimeStr);
+	if(isNaN(executeTime)){
+		alert("3请设置每两个和弦出现间隔时长；可设置每两个和弦出现间隔随机变速时长(毫秒)后缀(默认是0),例如：3,1");
+		return false;
+	}
+	intervalMillisecond = executeTime;
+	
+	if(timeArray.length > 1){
+		var changeTimeStr = timeArray[1].trim();
+		if(changeTimeStr.length > 0){
+			var changeTime = parseInt(changeTimeStr);
+			if(!isNaN(executeTime)){
+				randomMillisecond = changeTime;
+			}
+		}
+	}
+	
+	//启动
+	start();
+}
+
+//启动
+function start(){
+	//生成一个随机字符
+	var randomWeight = Math.floor(Math.random() * (totalWeight + 1));
+	var targetChord = null; 
+	for(var i = chordList.length-1; i>=0; i--){
+		if(randomWeight >= chordList[i].start){
+			targetChord = chordList[i];
+			break;
+		}
+	}
+	
+	if(targetChord == null){
+		alert("算法有问题，请检测查代码");
+		return false;
+	}
+	
+	document.getElementById("chordContent").innerHTML += targetChord.ch + ",&nbsp;&nbsp;&nbsp;&nbsp;";
+	
+	var chordImg = document.getElementById("chordImg");
+	chordImg.src = "img/" + targetChord.ch.toLowerCase() + ".jpg";
+	chordImg.alt = "找不到对应的和弦图";
+	
+	var nextMillisecond = generateMillisecond() + targetChord.addTime;
+	
+	timer = setTimeout("start()", nextMillisecond); 
+}
+
+//暂停
+function stopTimer(timerComponent){
+	if(timer){
+		clearTimeout(timer);
+		document.getElementById("timerComponent").value="继续";
+		timer=null;
+	}
+	else{
+		if(chordList){
+			document.getElementById("timerComponent").value="暂停";
+			start();
+		}
+	}
+}
+
+//变速
+function generateMillisecond(){
+	if(intervalMillisecond < 0){
+		return 400;
+	}
+	
+	if(randomMillisecond <= 0){
+		return intervalMillisecond;
+	}
+	
+	var millisecond = Math.floor(Math.random() * (2*randomMillisecond + 200) ) - randomMillisecond;
+	var newTime = intervalMillisecond + millisecond;
+	if(newTime <= 0){
+		return 400;
+	}
+	return newTime;
+}
+
+
+
+
+</script>
+
+
+
+
+</body>
+ 
+</html>
